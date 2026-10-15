@@ -1,0 +1,71 @@
+<#
+.SYNOPSIS
+    Rapid Windows Hardening Script for CCDC with Topology Placeholders
+.DESCRIPTION
+    Rotates local admin password, configures firewall rules with allowed scored ports, 
+    and disables unscored or risky services.
+#>
+
+# ==============================================================================
+# TOPOLOGY & CONFIGURATION PLACEHOLDERS (FILL ME IN WHEN MAP DROPS)
+# ==============================================================================
+$TargetServerIP = "[PUT_SERVER_IP_HERE]"          # e.g., "10.1.1.20"
+$ScoringEngineIP = "[PUT_SCORING_ENGINE_IP_HERE]" # e.g., "10.1.1.50"
+$NewPassword = "CHANGE_THIS_TO_YOUR_TEAM_ADMIN_PASSWORD"
+
+# Add any custom scored TCP/UDP ports required for this specific server based on your topology
+$ScoredPorts = @(
+    80,   # HTTP
+    443,  # HTTPS
+    3389  # RDP (Change or remove based on competition rules/hardening policy)
+    # TODO: Add your server-specific scored ports here (e.g., 53 for DNS, 389 for LDAP)
+)
+
+# Define unscored or vulnerable services to disable on this specific box
+$UnscoredServices = @(
+    "RemoteRegistry", 
+    "WMPNetworkSvc", 
+    "SNMP"
+    # TODO: Add any other non-scored or vulnerable services discovered during topology analysis
+)
+# ==============================================================================
+
+# Ensure script is run with administrator privileges
+If (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    Write-Error "[-] This script must be run with Administrator privileges!"
+    Exit 1
+}
+
+Write-Host "[+] Starting Windows Hardening and Lockdown for server: $TargetServerIP" -ForegroundColor Green
+
+# 1. Rotate Local Administrator Password
+try {
+    $AdminAccount = Get-LocalUser | Where-Object { $_.SID -like "*-500" }
+    $AdminAccount | Set-LocalUser -Password (ConvertTo-SecureString $NewPassword -AsPlainText -Force)
+    Write-Host "[+] Local Administrator password successfully updated." -ForegroundColor Cyan
+} catch {
+    Write-Warning "[-] Failed to update Administrator password: $_"
+}
+
+# 2. Enable Windows Firewall & Open Scored Ports
+Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True
+Write-Host "[+] Windows Firewall enabled for all profiles." -ForegroundColor Cyan
+
+foreach ($Port in $ScoredPorts) {
+    New-NetFirewallRule -DisplayName "CCDC-Allow-Port-$Port" -Direction Inbound -Protocol TCP -LocalPort $Port -Action Allow -ErrorAction SilentlyContinue
+    Write-Host "[+] Allowed inbound traffic on port: $Port" -ForegroundColor Green
+}
+
+# TODO: If your topology requires restricting inbound traffic specifically to the scoring engine IP, uncomment below:
+# New-NetFirewallRule -DisplayName "CCDC-ScoringEngine-Allow" -Direction Inbound -RemoteAddress $ScoringEngineIP -Action Allow
+
+# 3. Disable Risky/Unscored Services
+foreach ($Service in $UnscoredServices) {
+    if ($Service -ne "[PUT_SERVICE_NAME_HERE]" -and (Get-Service -Name $Service -ErrorAction SilentlyContinue)) {
+        Stop-Service -Name $Service -Force -ErrorAction SilentlyContinue
+        Set-Service -Name $Service -StartupType Disabled
+        Write-Host "[+] Disabled and stopped service: $Service" -ForegroundColor Yellow
+    }
+}
+
+Write-Host "[+] Windows lockdown completed successfully for $TargetServerIP." -ForegroundColor Green
