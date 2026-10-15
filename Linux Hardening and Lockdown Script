@@ -1,0 +1,82 @@
+#!/bin/bash
+
+# ==============================================================================
+# TOPOLOGY & CONFIGURATION PLACEHOLDERS (FILL ME IN WHEN MAP DROPS)
+# ==============================================================================
+TARGET_SERVER_IP="[PUT_SERVER_IP_HERE]"          # e.g., "10.1.1.10"
+SCORING_ENGINE_IP="[PUT_SCORING_ENGINE_IP_HERE]" # e.g., "10.1.1.50"
+NEW_ROOT_PASSWORD="CHANGE_THIS_TO_YOUR_TEAM_ROOT_PASSWORD"
+
+# Add custom scored TCP ports required for this specific server based on topology
+SCORED_PORTS=(
+    80    # HTTP
+    443   # HTTPS
+    22    # SSH (Change or restrict based on competition rules/hardening policy)
+    # TODO: Add server-specific scored ports here (e.g., 53 for DNS, 3306 for MySQL)
+)
+
+# Define unscored or vulnerable background services/daemons to stop & disable
+UNSCORED_SERVICES=(
+    "avahi-daemon"
+    "cups"
+    "bluetooth"
+    # TODO: Add any other non-scored services discovered during triage (ss -tulpn)
+)
+# ==============================================================================
+
+# Ensure script is run as root
+if [ "$EUID" -ne 0 ]; then
+  echo "[-] Please run as root."
+  exit 1
+fi
+
+echo "[+] Starting Linux Hardening and Lockdown for server: $TARGET_SERVER_IP"
+
+# 1. Rotate Root Credential & Secure Auth Files
+echo "$NEW_ROOT_PASSWORD" | passwd --stdin root 2>/dev/null || echo "root:$NEW_ROOT_PASSWORD" | chpasswd
+echo "[+] Root password successfully updated."
+
+# Enforce strict permissions on core authentication files to prevent harvesting
+chmod 644 /etc/passwd
+chmod 600 /etc/shadow
+echo "[+] Enforced strict permissions on /etc/passwd and /etc/shadow."
+
+# 2. Firewall Lockdown (UFW)
+# Reset firewall to default state
+ufw --force reset > /dev/null 2>&1
+
+# Set strict default policies (deny incoming, allow outgoing)
+ufw default deny incoming
+ufw default allow outgoing
+
+# Punch holes ONLY for required scored ports
+for port in "${SCORED_PORTS[@]}"; do
+    if [ -n "$port" ]; then
+        ufw allow "$port"/tcp
+        echo "[+] Allowed inbound TCP port: $port"
+    fi
+done
+
+# TODO: If restricting inbound polling traffic strictly to the scoring engine IP:
+# ufw allow from $SCORING_ENGINE_IP to any
+
+# Enable UFW without prompting
+ufw --force enable
+echo "[+] Uncomplicated Firewall (UFW) enabled and locked down."
+
+# 3. Disable Risky/Unscored Services
+for service in "${UNSCORED_SERVICES[@]}"; do
+    if [ "$service" != "[PUT_SERVICE_NAME_HERE]" ] && [ -n "$service" ]; then
+        systemctl stop "$service" 2>/dev/null
+        systemctl disable "$service" 2>/dev/null
+        echo "[+] Disabled and stopped service: $service"
+    fi
+done
+
+# 4. Privilege Escalation Audit (SUID Binary Scan)
+echo "[+] Auditing system for SUID binaries (Privilege Escalation vectors)..."
+find / -perm -4000 -type f 2>/dev/null > /tmp/suid_files.txt
+echo "[+] SUID audit exported to /tmp/suid_files.txt"
+
+echo "[+] Linux lockdown completed successfully for $TARGET_SERVER_IP."
+echo "[*] REMINDER: Check the Quotient dashboard immediately to verify service status!"
