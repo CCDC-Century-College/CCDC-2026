@@ -11,5 +11,5 @@ sudo /opt/splunkforwarder/bin/splunk start --accept-license --answer-yes --no-pr
 #Verification: sudo /opt/splunkforwarder/bin/splunk status
 
 # 4. Point the forwarder to your Debian Splunk collector
-sudo /opt/splunkforwarder/bin/splunk add forward-server 17.20.240.20:9997 -auth admin:sysadmin:Changeme1!
+sudo /opt/splunkforwarder/bin/splunk add forward-server 17.20.240.20:9997 -auth admin:PLACEHOLDER
 #Verification: sudo /opt/splunkforwarder/bin/splunk list forward-server
