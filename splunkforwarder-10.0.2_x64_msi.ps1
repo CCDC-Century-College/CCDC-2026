@@ -7,5 +7,5 @@ Invoke-WebRequest -Uri $downloadUrl -OutFile $outputPath
 #Verification: Test-Path $outputPath
 
 Write-Host "Installing silently..."
-Start-Process msiexec.exe -ArgumentList "/i `"$outputPath`" /quiet RECEIVER_INDEXER=17.20.240.20:9997 AGREETOLICENSE=Yes" -Wait
+Start-Process msiexec.exe -ArgumentList "/i `"$outputPath`" /quiet RECEIVER_INDEXER=172.20.240.20:9997 AGREETOLICENSE=Yes" -Wait
 #Verification: Get-Service -Name "SplunkForwarder"
