@@ -97,3 +97,13 @@ Copy-Item "C:\Program Files\ClamAV\conf_examples\clamd.conf.sample" "C:\Program 
 # Run
 & "C:\Program Files\ClamAV\clamscan.exe" -r "C:\Users\Public" "C:\Windows\Temp" "C:\inetpub" --log="C:\ccdc\clamav_scan.log"
 ```
+$CommString = "CCDC_Public_RO"
+New-Item -Path "HKLM:\SYSTEM\CurrentControlSet\Services\SNMP\Parameters\ValidCommunities" -Force | Out-Null
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\SNMP\Parameters\ValidCommunities" -Name $CommString -Value 4 -Type DWord
+
+# 3. Allow Queries From Any External Manager
+Remove-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\SNMP\Parameters\PermittedManagers" -Name "1" -ErrorAction SilentlyContinue
+
+# 4. Open Host Firewall for UDP 161 (External Access) & Restart SNMP
+netsh advfirewall firewall add rule name="CCDC_SNMP_v2c_External" dir=in action=allow protocol=UDP localport=161
+Restart-Service -Name "SNMP" -Force
