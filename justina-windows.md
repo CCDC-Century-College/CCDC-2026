@@ -78,3 +78,22 @@ reg add "HKLM\SYSTEM\CurrentControlSet\Services\Netlogon\Parameters" /v RequireS
 reg add "HKLM\SYSTEM\CurrentControlSet\Services\Netlogon\Parameters" /v RequireSignOrSeal /t REG_DWORD /d 1 /f
 Restart-Service -Name "Netlogon" -Force
 ```
+
+
+```
+New-Item -ItemType Directory -Path "C:\Program Files\ClamAV", "C:\Tools\ClamAV\db" -Force | Out-Null
+Set-Location "C:\Tools"
+
+$ClamUrl = "https://www.clamav.net/downloads/production/clamav-1.5.4.win.x64.zip"
+Invoke-WebRequest -Uri $ClamUrl -OutFile "C:\Tools\clamav.zip"
+Expand-Archive -Path "C:\Tools\clamav.zip" -DestinationPath "C:\Program Files\ClamAV" -Force
+
+# Config Setup refer 2 docs
+Copy-Item "C:\Program Files\ClamAV\conf_examples\freshclam.conf.sample" "C:\Program Files\ClamAV\freshclam.conf"
+Copy-Item "C:\Program Files\ClamAV\conf_examples\clamd.conf.sample" "C:\Program Files\ClamAV\clamd.conf"
+(Get-Content "C:\Program Files\ClamAV\freshclam.conf") | Where-Object { $_ -ne "Example" } | Set-Content "C:\Program Files\ClamAV\freshclam.conf"
+(Get-Content "C:\Program Files\ClamAV\clamd.conf") | Where-Object { $_ -ne "Example" } | Set-Content "C:\Program Files\ClamAV\clamd.conf"
+
+# Run
+& "C:\Program Files\ClamAV\clamscan.exe" -r "C:\Users\Public" "C:\Windows\Temp" "C:\inetpub" --log="C:\ccdc\clamav_scan.log"
+```
